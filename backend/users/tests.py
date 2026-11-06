@@ -102,3 +102,55 @@ class UserSecurityTests(APITestCase):
         self.lector.refresh_from_db()
         self.assertTrue(self.lector.check_password('OtraClave#2024'))
         self.assertFalse(self.lector.check_password(LECTOR_PASS))
+
+
+class RegisterTests(APITestCase):
+    url = '/api/v1/auth/register/'
+    payload = {
+        'username': 'nuevo', 'email': 'nuevo@biblioteca.mx', 'password': 'Registro#2024',
+        'first_name': 'Nuevo', 'last_name': 'Lector', 'matricula': 'C0003',
+    }
+
+    def test_registro_publico_crea_usuario_con_password_hasheada(self):
+        resp = self.client.post(self.url, self.payload, format='json')
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertNotIn('password', str(resp.data))
+        user = User.objects.get(email='nuevo@biblioteca.mx')
+        self.assertTrue(user.check_password('Registro#2024'))
+        self.assertNotEqual(user.password, 'Registro#2024')
+        self.assertEqual(user.matricula, 'C0003')
+
+    def test_no_se_puede_registrar_como_admin(self):
+        data = dict(self.payload, is_staff=True, is_superuser=True)
+        self.assertEqual(self.client.post(self.url, data, format='json').status_code, 201)
+        user = User.objects.get(email='nuevo@biblioteca.mx')
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+
+    def test_password_corta_o_comun_se_rechaza(self):
+        for bad in ('corta', 'password123'):
+            resp = self.client.post(self.url, dict(self.payload, password=bad), format='json')
+            self.assertEqual(resp.status_code, 400, bad)
+
+    def test_email_duplicado_se_rechaza(self):
+        self.client.post(self.url, self.payload, format='json')
+        resp = self.client.post(self.url, dict(self.payload, username='otro', matricula='C9'), format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_registro_con_token_vencido_en_header_no_falla(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer token.invalido.xxx')
+        self.assertEqual(self.client.post(self.url, self.payload, format='json').status_code, 201)
+
+    def test_se_puede_iniciar_sesion_tras_registrarse(self):
+        self.client.post(self.url, self.payload, format='json')
+        resp = self.client.post('/api/v1/auth/token/',
+                                {'email': 'nuevo@biblioteca.mx', 'password': 'Registro#2024'}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.data)
+
+    def test_matriculas_vacias_no_chocan(self):
+        for i in range(2):
+            resp = self.client.post(self.url, {
+                'username': f'u{i}', 'email': f'u{i}@biblioteca.mx',
+                'password': 'Registro#2024', 'matricula': ''}, format='json')
+            self.assertEqual(resp.status_code, 201, resp.content)

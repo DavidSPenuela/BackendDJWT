@@ -1,4 +1,5 @@
 from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from users.models import User
@@ -20,6 +21,10 @@ class UserSerializer(serializers.ModelSerializer):
         password_validation.validate_password(value)
         return value
 
+    def validate_matricula(self, value):
+        # Cadena vacía -> NULL, para que varios usuarios sin matrícula no choquen por unicidad
+        return value or None
+
     def validate(self, attrs):
         # La contraseña es obligatoria únicamente al crear
         if self.instance is None and not attrs.get('password'):
@@ -40,3 +45,30 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class RegisterUserSerializer(serializers.ModelSerializer):
+    """Registro público: solo expone campos seguros (nunca is_staff / is_active)."""
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'matricula']
+        extra_kwargs = {
+            'password': {'write_only': True, 'style': {'input_type': 'password'}},
+        }
+
+    def validate_matricula(self, value):
+        return value or None
+
+    def validate(self, attrs):
+        candidate = User(username=attrs.get('username'), email=attrs.get('email'),
+                         first_name=attrs.get('first_name', ''), last_name=attrs.get('last_name', ''))
+        try:
+            password_validation.validate_password(attrs['password'], user=candidate)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+        return attrs
+
+    def create(self, validated_data):
+        # create_user hashea la contraseña con set_password
+        return User.objects.create_user(**validated_data)

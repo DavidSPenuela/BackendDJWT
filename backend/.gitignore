@@ -1,0 +1,19 @@
+# Entorno virtual y base de datos local
+venv/
+env/
+.venv/
+db.sqlite3
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+dist/
+
+# Editor / sistema
+.vscode/
+.idea/
+.DS_Store

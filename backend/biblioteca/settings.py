@@ -13,7 +13,7 @@ SECRET_KEY = os.environ.get(
     'django-insecure-cambia-esta-clave-solo-para-desarrollo-local',
 )
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 # Application definition
 BASE_APPS = [
@@ -28,10 +28,12 @@ BASE_APPS = [
 THIRD_APPS = [
     'rest_framework',
     'drf_yasg',
+    'corsheaders',
 ]
 
 OWN_APPS = [
     'users',
+    'services',
 ]
 
 INSTALLED_APPS = BASE_APPS + THIRD_APPS + OWN_APPS
@@ -39,6 +41,7 @@ INSTALLED_APPS = BASE_APPS + THIRD_APPS + OWN_APPS
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -117,3 +120,15 @@ SWAGGER_SETTINGS = {
         }
     },
 }
+
+# CORS: solo el frontend de Vite (en el manual se usaba CORS_ORIGIN_ALLOW_ALL = True, demasiado permisivo)
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+
+# SOAP: WSDL del servicio público de países (se puede cambiar con una variable de entorno)
+SOAP_COUNTRY_WSDL = os.environ.get(
+    'SOAP_COUNTRY_WSDL',
+    'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL',
+)
